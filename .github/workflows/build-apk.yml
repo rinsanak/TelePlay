@@ -1,0 +1,43 @@
+name: Build TelePlay APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract TelePlay ZIP
+        run: |
+          unzip -o TelePlay-features-added.zip -d teleplay
+          echo "ZIP extracted"
+          find teleplay -name gradlew -type f
+
+      - name: Find Android project
+        run: |
+          GRADLEW=$(find teleplay -name gradlew -type f | head -n 1)
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: gradlew not found"
+            exit 1
+          fi
+          echo "Gradle wrapper: $GRADLEW"
+          echo "GRADLEW=$GRADLEW" >> $GITHUB_ENV
+          echo "PROJECT_DIR=$(dirname "$GRADLEW")" >> $GITHUB_ENV
+
+      - name: Make Gradle executable
+        run: chmod +x "$GRADLEW"
+
+      - name: Build Debug APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TelePlay-debug-APK
+          path: |
+            **/build/outputs/apk/**/*.apk
