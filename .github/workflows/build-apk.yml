@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-apk.yml'
+      - '.github/patches.sh'
+      - '.github/inspect.sh'
       - 'TelePlay-features-added.zip'
   workflow_dispatch:
 
@@ -31,46 +33,33 @@ jobs:
           unzip -q -o TelePlay-features-added.zip -d teleplay
           echo "ZIP extracted"
 
+      - name: Apply source patches
+        run: bash .github/patches.sh
+
       - name: Find Android project
         run: |
           GRADLEW=$(find teleplay -name gradlew -type f | head -n 1)
           if [ -z "$GRADLEW" ]; then
             echo "ERROR: gradlew not found"
-            mkdir -p report
-            echo "gradlew not found in zip" > report/status.txt
-            find teleplay -maxdepth 3 | sort | head -150 > report/structure.txt
             exit 1
           fi
           echo "Gradle wrapper: $GRADLEW"
           echo "GRADLEW=$GRADLEW" >> $GITHUB_ENV
           echo "PROJECT_DIR=$(dirname "$GRADLEW")" >> $GITHUB_ENV
 
-      - name: Write structure report
+      - name: Dump source context
         run: |
           mkdir -p report
-          {
-            echo "=== TOP LEVEL ==="; ls -la teleplay
-            echo; echo "=== PROJECT_DIR ==="; echo "$PROJECT_DIR"
-            echo; echo "=== TREE depth 3 ==="; find teleplay -maxdepth 3 -not -path '*/.git/*' | sort | head -150
-            echo; echo "=== FILE COUNTS ==="
-            echo "kotlin: $(find teleplay -name '*.kt' | wc -l)  java: $(find teleplay -name '*.java' | wc -l)  c/cpp: $(find teleplay \( -name '*.c' -o -name '*.cpp' \) | wc -l)"
-            echo; echo "=== SIZE ==="; du -sh teleplay
-          } > report/structure.txt
-          find teleplay -maxdepth 4 \( -name 'settings.gradle*' -o -name 'build.gradle*' -o -name 'gradle-wrapper.properties' -o -name 'gradle.properties' -o -name 'README*' \) -not -path '*/node_modules/*' -print0 | head -z -n 20 | while IFS= read -r -d '' f; do
-            echo "##### $f"; head -c 6000 "$f"; echo
-          done > report/configs.txt
-          find teleplay -name AndroidManifest.xml -not -path '*/build/*' -print0 | head -z -n 3 | while IFS= read -r -d '' f; do
-            echo "##### $f"; head -c 4000 "$f"; echo
-          done >> report/configs.txt
+          bash .github/inspect.sh > report/context.txt 2>&1 || true
 
-      - name: Publish structure report
+      - name: Publish context report
         run: |
           cd report
           git init -q -b build-logs
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -q -m "structure report run ${{ github.run_number }}"
+          git commit -q -m "context report run ${{ github.run_number }}"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" build-logs
 
       - name: Build Debug APK
