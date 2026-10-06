@@ -1,0 +1,104 @@
+##### teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/player/PlayerViewModel.kt
+490: 
+491:             exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+492:                 .buildUpon()
+493:                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+494:                 .setOverrideForType(
+495:                     TrackSelectionOverride(trackGroup, listOf(trackInfo.index))
+496:                 )
+497:                 .build()
+498:             _uiState.value = _uiState.value.copy(
+499:                 subtitlesEnabled = true,
+500:                 externalSubtitleName = null
+501:             )
+502:         }
+503:     }
+504: 
+505:     /**
+506:      * Set subtitle size.
+507:      */
+508:     fun setSubtitleSize(size: SubtitleSize) {
+509:         _uiState.value = _uiState.value.copy(subtitleSize = size)
+510:         // Note: Actual subtitle styling would need CaptionStyleCompat applied to PlayerView
+511:     }
+512: 
+513:     /**
+514:      * Load the four newest subtitle files for the current video, ranked by filename match.
+515:      */
+516:     fun loadExternalSubtitles() {
+517:         viewModelScope.launch {
+518:             _uiState.value = _uiState.value.copy(isLoadingExternalSubtitles = true)
+519:             filesRepository.getSubtitles(fileId, 4).onSuccess { subtitles ->
+520:                 _uiState.value = _uiState.value.copy(
+521:                     externalSubtitleFiles = subtitles,
+522:                     isLoadingExternalSubtitles = false
+523:                 )
+524:             }.onFailure {
+525:                 _uiState.value = _uiState.value.copy(
+526:                     externalSubtitleFiles = emptyList(),
+527:                     isLoadingExternalSubtitles = false
+528:                 )
+529:             }
+530:         }
+531:     }
+532: 
+533:     /** Add a subtitle stored in the TelePlay Telegram storage. */
+534:     fun addExternalSubtitle(subtitle: FileItem) {
+535:         viewModelScope.launch {
+536:             val serverUrl = settingsRepository.getServerUrl()
+537:             val subtitleUri = Uri.parse("$serverUrl/api/stream/${subtitle.id}")
+538:             applyExternalSubtitle(
+539:                 uri = subtitleUri,
+540:                 label = subtitle.fileName,
+541:                 language = null,
+542:                 mimeType = subtitleMimeType(subtitle.fileName),
+543:                 externalId = subtitle.id.toString()
+544:             )
+545:         }
+546:     }
+547: 
+548:     /** Add a local subtitle selected from Android storage. */
+549:     fun addLocalSubtitle(uri: Uri) {
+550:         val displayName = queryDisplayName(uri) ?: uri.lastPathSegment?.substringAfterLast('/') ?: "Local subtitle"
+551:         if (subtitleMimeType(displayName) == null) {
+552:             Toast.makeText(context, "Select an SRT, VTT, ASS or SSA file", Toast.LENGTH_SHORT).show()
+553:             return
+554:         }
+555:         applyExternalSubtitle(
+556:             uri = uri,
+557:             label = displayName,
+558:             language = null,
+559:             mimeType = subtitleMimeType(displayName),
+560:             externalId = "local"
+561:         )
+562:     }
+563: 
+564:     private fun applyExternalSubtitle(
+565:         uri: Uri,
+566:         label: String,
+567:         language: String?,
+568:         mimeType: String?,
+569:         externalId: String
+570:     ) {
+571:         val currentItem = exoPlayer.currentMediaItem ?: return
+572:         val localConfig = currentItem.localConfiguration ?: return
+573: 
+574:         val configs = localConfig.subtitleConfigurations
+575:             .filterNot { it.id?.startsWith("teleplay-external:") == true }
+
+##### getServerUrl usages
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/details/DetailsViewModel.kt:73:            val serverUrl = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/player/PlayerViewModel.kt:536:            val serverUrl = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/player/PlayerViewModel.kt:713:                        val serverUrl = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/player/PlayerViewModel.kt:799:            val serverUrl = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/home/HomeViewModel.kt:55:            val serverUrl = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/mobile/home/MobileHomeViewModel.kt:93:                val url = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/mobile/home/MobileHomeViewModel.kt:264:            val serverUrl = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/mobile/home/MobileHomeViewModel.kt:278:            val serverUrl = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/mobile/home/MobileHomeViewModel.kt:296:            val serverUrl = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/mobile/home/MobileHomeViewModel.kt:321:            val serverUrl = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/mobile/downloads/DownloadsViewModel.kt:77:            val serverUrl = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/search/SearchViewModel.kt:63:            val serverUrl = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/ui/browse/FolderViewModel.kt:57:            val serverUrl = settingsRepository.getServerUrl()
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/data/repository/SettingsRepository.kt:45:    suspend fun getServerUrl(): String {
+teleplay/TelePlay-main/android/app/src/main/java/com/telegramtv/di/NetworkModule.kt:92:        val serverUrl = runBlocking { settingsRepository.getServerUrl() }
